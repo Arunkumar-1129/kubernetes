@@ -1,0 +1,12 @@
+sudo tee -a /etc/hosts <<EOF
+192.168.142.11  k3s-master.sece.com  k3s-master
+192.168.142.12  k3s-worker1.sece.com k3s-worker1
+192.168.142.13  k3s-worker2.sece.com k3s-worker2
+EOF 
+
+
+
+curl -sfL https://get.k3s.io | \
+K3S_URL=https://k3s-master.sece.com:6443 \
+K3S_TOKEN="K10d77c075b4c37a70ffa36d11812bbffdbf8b0f05f75a2ad0646d2d9122ad43fe7::server:a0f34418d9bc7f87186be26a7f22ac89" \
+sh -
