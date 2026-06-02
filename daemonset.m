@@ -80,7 +80,7 @@ pod/nginx-pod                           1/1     Running   1 (50m ago)   12h     
 kubectl delete pod/nginx-daemonset-w2rxg
 
 
-creating namespace
+creating namespace in the name of dev
 
 root@k3s-master:~# vi nginx-rs.yaml
 root@k3s-master:~# kubectl create ns dev
