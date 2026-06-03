@@ -465,7 +465,7 @@ kubectl rollout undo deployment/deployment -n dev
 
 This lab demonstrated how to deploy an application inside a custom namespace, inspect Kubernetes resources, view container logs, scale Deployments, track rollout revisions, update container images, and perform Deployment rollbacks using Kubernetes Deployment objects. :contentReference[oaicite:0]{index=0}
  
- 
+ ```
  vi deployment.yaml
 root@k3s-master:~# kubectl apply -f deployment.yaml
 Error from server (BadRequest): error when creating "deployment.yaml": Deployment in version "v1" cannot be handled as a Deployment: strict decoding error: un                 known field "metadata.namespaces"
