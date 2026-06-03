@@ -1,3 +1,471 @@
+# Kubernetes Deployment in Namespace Lab
+
+## Overview
+
+This lab demonstrates how to deploy an Nginx application inside a custom namespace, inspect Pods, ReplicaSets and Deployments, view logs, scale the application, and perform Deployment rollouts and rollbacks.
+
+---
+
+## Create Deployment in Namespace
+
+Create a file named `deployment.yaml`.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: deployment
+  namespace: dev
+  labels:
+    app: nginx
+    env: prod
+
+spec:
+  replicas: 3
+
+  strategy:
+    type: Recreate
+
+  selector:
+    matchLabels:
+      app: nginx-app
+
+  template:
+    metadata:
+      labels:
+        app: nginx-app
+
+    spec:
+      containers:
+      - name: nginx-container
+        image: nginx:1.26
+        ports:
+        - containerPort: 80
+```
+
+---
+
+## Common YAML Error
+
+Incorrect field:
+
+```yaml
+metadata:
+  namespaces: dev
+```
+
+Error:
+
+```bash
+Error from server (BadRequest):
+unknown field "metadata.namespaces"
+```
+
+Correct field:
+
+```yaml
+metadata:
+  namespace: dev
+```
+
+---
+
+## Apply Deployment
+
+```bash
+kubectl apply -f deployment.yaml
+```
+
+Output:
+
+```bash
+deployment.apps/deployment created
+```
+
+---
+
+## Verify Pods in Namespace
+
+```bash
+kubectl get pods -n dev
+```
+
+Output:
+
+```bash
+NAME                          READY   STATUS
+deployment-74b7cd9f45-2s7jz   1/1     Running
+deployment-74b7cd9f45-jvdcn   1/1     Running
+deployment-74b7cd9f45-vr6k2   1/1     Running
+```
+
+---
+
+## View Deployment, ReplicaSet and Pods
+
+```bash
+kubectl get deploy,rs,po -o wide -n dev
+```
+
+Output:
+
+```bash
+NAME                         READY   UP-TO-DATE   AVAILABLE
+deployment.apps/deployment   3/3     3            3
+
+NAME                                    DESIRED   CURRENT   READY
+replicaset.apps/deployment-74b7cd9f45   3         3         3
+
+NAME                              READY   STATUS
+pod/deployment-74b7cd9f45-2s7jz   1/1     Running
+pod/deployment-74b7cd9f45-jvdcn   1/1     Running
+pod/deployment-74b7cd9f45-vr6k2   1/1     Running
+```
+
+---
+
+## Describe Pod
+
+Without namespace:
+
+```bash
+kubectl describe pod deployment-74b7cd9f45-2s7jz
+```
+
+Output:
+
+```bash
+Error from server (NotFound)
+```
+
+Correct command:
+
+```bash
+kubectl describe pod deployment-74b7cd9f45-2s7jz -n dev
+```
+
+Information displayed:
+
+- Pod Name
+- Namespace
+- Node
+- IP Address
+- Container Details
+- Events
+- Volume Information
+- Conditions
+
+---
+
+## Describe ReplicaSet
+
+Incorrect:
+
+```bash
+kubectl describe rs nginx-rs.yaml -n dev
+```
+
+Output:
+
+```bash
+Error from server (NotFound)
+```
+
+Correct:
+
+```bash
+kubectl describe rs nginx-rs -n dev
+```
+
+---
+
+## Describe Deployment
+
+Incorrect:
+
+```bash
+kubectl describe deploy nginx-deployment.yaml -n dev
+```
+
+Output:
+
+```bash
+Error from server (NotFound)
+```
+
+Correct:
+
+```bash
+kubectl describe deploy deployment -n dev
+```
+
+Output:
+
+```text
+Name: deployment
+Namespace: dev
+Replicas: 3 desired | 3 available
+StrategyType: Recreate
+```
+
+---
+
+## View Container Logs
+
+Display Pod logs:
+
+```bash
+kubectl logs deployment-74b7cd9f45-2s7jz -n dev
+```
+
+Display logs from a specific container:
+
+```bash
+kubectl logs deployment-74b7cd9f45-2s7jz nginx-container -n dev
+```
+
+Sample Output:
+
+```text
+nginx/1.26.3
+start worker processes
+Container started
+```
+
+---
+
+## Scale Deployment
+
+Incorrect:
+
+```bash
+kubectl scale deployment nginx-deploy --replicas=5 -n dev
+```
+
+Output:
+
+```bash
+Error from server (NotFound)
+```
+
+Correct:
+
+```bash
+kubectl scale deployment deployment --replicas=5 -n dev
+```
+
+Scale down:
+
+```bash
+kubectl scale deployment deployment --replicas=3 -n dev
+```
+
+Scale up again:
+
+```bash
+kubectl scale deployment deployment --replicas=5 -n dev
+```
+
+---
+
+## Verify Namespace
+
+```bash
+kubectl get ns
+```
+
+Output:
+
+```bash
+NAME
+default
+dev
+kube-system
+kube-public
+kube-node-lease
+```
+
+---
+
+## Rollout History
+
+Incorrect:
+
+```bash
+kubectl rollout history deployment/nginx-deploy -n dev
+```
+
+Output:
+
+```bash
+Error from server (NotFound)
+```
+
+Correct:
+
+```bash
+kubectl rollout history deployment/deployment -n dev
+```
+
+Output:
+
+```bash
+deployment.apps/deployment
+
+REVISION  CHANGE-CAUSE
+1         <none>
+```
+
+---
+
+## Update Deployment Image
+
+Update image version:
+
+```bash
+kubectl set image deployment/deployment nginx-container=nginx:1.25 -n dev
+```
+
+Output:
+
+```bash
+deployment.apps/deployment image updated
+```
+
+---
+
+## Verify New Revision
+
+```bash
+kubectl rollout history deployment/deployment -n dev
+```
+
+Output:
+
+```bash
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+```
+
+---
+
+## Check Rollout Status
+
+```bash
+kubectl rollout status deployment/deployment -n dev
+```
+
+Output:
+
+```bash
+deployment "deployment" successfully rolled out
+```
+
+---
+
+## Rollback Deployment
+
+```bash
+kubectl rollout undo deployment/deployment -n dev
+```
+
+Output:
+
+```bash
+deployment.apps/deployment rolled back
+```
+
+---
+
+## Useful Commands
+
+### Apply Deployment
+
+```bash
+kubectl apply -f deployment.yaml
+```
+
+### View Pods
+
+```bash
+kubectl get pods -n dev
+```
+
+### View Deployments
+
+```bash
+kubectl get deploy -n dev
+```
+
+### View ReplicaSets
+
+```bash
+kubectl get rs -n dev
+```
+
+### View Deployment, ReplicaSets and Pods
+
+```bash
+kubectl get deploy,rs,po -o wide -n dev
+```
+
+### Describe Pod
+
+```bash
+kubectl describe pod <pod-name> -n dev
+```
+
+### Describe Deployment
+
+```bash
+kubectl describe deploy deployment -n dev
+```
+
+### View Logs
+
+```bash
+kubectl logs <pod-name> -n dev
+```
+
+### Scale Deployment
+
+```bash
+kubectl scale deployment deployment --replicas=5 -n dev
+```
+
+### View Rollout History
+
+```bash
+kubectl rollout history deployment/deployment -n dev
+```
+
+### Update Image
+
+```bash
+kubectl set image deployment/deployment nginx-container=nginx:1.25 -n dev
+```
+
+### Rollout Status
+
+```bash
+kubectl rollout status deployment/deployment -n dev
+```
+
+### Rollback
+
+```bash
+kubectl rollout undo deployment/deployment -n dev
+```
+
+---
+
+## Conclusion
+
+This lab demonstrated how to deploy an application inside a custom namespace, inspect Kubernetes resources, view container logs, scale Deployments, track rollout revisions, update container images, and perform Deployment rollbacks using Kubernetes Deployment objects. :contentReference[oaicite:0]{index=0}
+ 
+ 
  vi deployment.yaml
 root@k3s-master:~# kubectl apply -f deployment.yaml
 Error from server (BadRequest): error when creating "deployment.yaml": Deployment in version "v1" cannot be handled as a Deployment: strict decoding error: un                 known field "metadata.namespaces"
