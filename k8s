@@ -1,3 +1,311 @@
+# Kubernetes ReplicaSet Lab
+
+## Overview
+
+This lab demonstrates the creation, verification, scaling, and management of a Kubernetes ReplicaSet using an Nginx container image.
+
+---
+
+## ReplicaSet Configuration
+
+Create a file named `replicaset.yaml`.
+
+```yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+
+metadata:
+  name: nginx-replicaset
+  labels:
+    app: nginx
+    env: prod
+
+spec:
+  replicas: 10
+
+  selector:
+    matchLabels:
+      app: nginx-app
+
+  template:
+    metadata:
+      labels:
+        app: nginx-app
+
+    spec:
+      containers:
+      - name: nginx-container
+        image: nginx
+        ports:
+        - containerPort: 80
+```
+
+---
+
+## Create ReplicaSet
+
+Apply the configuration file:
+
+```bash
+kubectl create -f replicaset.yaml
+```
+
+Expected Output:
+
+```bash
+replicaset.apps/nginx-replicaset created
+```
+
+---
+
+## Verify ReplicaSet Creation
+
+View all ReplicaSets:
+
+```bash
+kubectl get rs
+```
+
+Example Output:
+
+```bash
+NAME               DESIRED   CURRENT   READY   AGE
+nginx-replicaset   10        10        10      30s
+```
+
+---
+
+## Verify Pods Created by ReplicaSet
+
+```bash
+kubectl get rs,po
+```
+
+Example Output:
+
+```bash
+NAME                               DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-replicaset   10        10        10      30s
+
+NAME                         READY   STATUS    RESTARTS   AGE
+pod/nginx-replicaset-48nn7   1/1     Running   0          30s
+pod/nginx-replicaset-4ds7q   1/1     Running   0          30s
+pod/nginx-replicaset-4nn2c   1/1     Running   0          30s
+pod/nginx-replicaset-9vp5s   1/1     Running   0          30s
+pod/nginx-replicaset-c7wml   1/1     Running   0          30s
+pod/nginx-replicaset-knwws   1/1     Running   0          30s
+pod/nginx-replicaset-pb8xp   1/1     Running   0          30s
+pod/nginx-replicaset-q8khg   1/1     Running   0          30s
+pod/nginx-replicaset-vg75l   1/1     Running   0          30s
+pod/nginx-replicaset-zbnnx   1/1     Running   0          30s
+```
+
+---
+
+## View Detailed Information
+
+```bash
+kubectl describe rs nginx-replicaset
+```
+
+Sample Output:
+
+```text
+Name:         nginx-replicaset
+Namespace:    default
+Selector:     app=nginx-app
+Labels:       app=nginx
+              env=prod
+
+Replicas:     10 current / 10 desired
+
+Pod Template:
+  Labels: app=nginx-app
+
+Containers:
+  nginx-container:
+    Image: nginx
+    Port: 80/TCP
+```
+
+---
+
+## Display Additional Details
+
+```bash
+kubectl get rs nginx-replicaset -o wide
+```
+
+Example Output:
+
+```bash
+NAME               DESIRED   CURRENT   READY   AGE   CONTAINERS        IMAGES   SELECTOR
+nginx-replicaset   10        10        10      2m    nginx-container   nginx    app=nginx-app
+```
+
+---
+
+## View Pod Placement Across Nodes
+
+```bash
+kubectl get rs,po -o wide
+```
+
+Example Output:
+
+```bash
+NAME                               DESIRED   CURRENT   READY   AGE   CONTAINERS        IMAGES   SELECTOR
+replicaset.apps/nginx-replicaset   10        10        10      2m    nginx-container   nginx    app=nginx-app
+
+NAME                         READY   STATUS    RESTARTS   AGE   IP              NODE
+pod/nginx-replicaset-48nn7   1/1     Running   0          2m    192.168.1.54    node01
+pod/nginx-replicaset-4ds7q   1/1     Running   0          2m    192.168.0.1     controlplane
+...
+```
+
+---
+
+## Scale ReplicaSet Up
+
+Increase replicas from 10 to 15.
+
+```bash
+kubectl scale rs nginx-replicaset --replicas=15
+```
+
+Expected Output:
+
+```bash
+replicaset.apps/nginx-replicaset scaled
+```
+
+Verify:
+
+```bash
+kubectl get rs,po
+```
+
+Example Output:
+
+```bash
+NAME                               DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-replicaset   15        15        15      6m
+```
+
+Additional Pods are automatically created.
+
+---
+
+## Scale ReplicaSet Down
+
+Reduce replicas from 15 to 7.
+
+```bash
+kubectl scale rs nginx-replicaset --replicas=7
+```
+
+Expected Output:
+
+```bash
+replicaset.apps/nginx-replicaset scaled
+```
+
+Verify:
+
+```bash
+kubectl get rs,po -o wide
+```
+
+Example Output:
+
+```bash
+NAME                               DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-replicaset   7         7         7       13m
+```
+
+Kubernetes automatically removes excess Pods and maintains the desired count.
+
+---
+
+## Common Errors
+
+### Incorrect Command
+
+```bash
+kubectl replicaset nginx-replicaset --replicas=15
+```
+
+Output:
+
+```bash
+error: unknown command "replicaset" for "kubectl"
+```
+
+### Correct Command
+
+```bash
+kubectl scale rs nginx-replicaset --replicas=15
+```
+
+---
+
+## Useful Commands Reference
+
+### Create ReplicaSet
+
+```bash
+kubectl create -f replicaset.yaml
+```
+
+### List ReplicaSets
+
+```bash
+kubectl get rs
+```
+
+### List Pods
+
+```bash
+kubectl get po
+```
+
+### List ReplicaSets and Pods
+
+```bash
+kubectl get rs,po
+```
+
+### Detailed ReplicaSet Information
+
+```bash
+kubectl describe rs nginx-replicaset
+```
+
+### Scale Up
+
+```bash
+kubectl scale rs nginx-replicaset --replicas=15
+```
+
+### Scale Down
+
+```bash
+kubectl scale rs nginx-replicaset --replicas=7
+```
+
+### Delete ReplicaSet
+
+```bash
+kubectl delete rs nginx-replicaset
+```
+
+---
+
+## Conclusion
+
+ReplicaSet ensures that the specified number of Pod replicas are always running. If a Pod fails or is deleted, ReplicaSet automatically creates a replacement Pod to maintain the desired state of the application.
+
+
 root@controlplane:~$ vi replicaset.yaml 
 root@controlplane:~$ cat replicaset.yaml
 apiVersion: apps/v1
