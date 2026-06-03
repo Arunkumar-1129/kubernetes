@@ -1,3 +1,4 @@
+```
 root@k3s-master:~# history
     1  cat /etc/hosts
     2  sudo tee -a /etc/hosts <<EOF
