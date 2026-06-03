@@ -1,3 +1,445 @@
+# Kubernetes Deployment Lab
+
+## Overview
+
+This lab demonstrates how to create, scale, update, monitor, and rollback a Kubernetes Deployment using the Nginx container image. It also illustrates how Deployments manage ReplicaSets and Pods during rolling updates.
+
+---
+
+## Create ReplicaSet
+
+Create a file named `nginx-rs.yaml`.
+
+```yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+
+metadata:
+  name: nginx-rs
+
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: nginx
+
+  template:
+    metadata:
+      labels:
+        app: nginx
+
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+```
+
+Apply the ReplicaSet:
+
+```bash
+kubectl apply -f nginx-rs.yaml
+```
+
+Verify:
+
+```bash
+kubectl get rs
+```
+
+Output:
+
+```bash
+NAME       DESIRED   CURRENT   READY
+nginx-rs   3         3         3
+```
+
+---
+
+## Create Deployment
+
+Create a file named `nginx-deployment.yaml`.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: nginx-deployment
+
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: nginx
+
+  template:
+    metadata:
+      labels:
+        app: nginx
+
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25
+        ports:
+        - containerPort: 80
+```
+
+Apply the Deployment:
+
+```bash
+kubectl apply -f nginx-deployment.yaml
+```
+
+Output:
+
+```bash
+deployment.apps/nginx-deployment created
+```
+
+---
+
+## Verify Deployment
+
+```bash
+kubectl get deploy
+```
+
+Output:
+
+```bash
+NAME               READY   UP-TO-DATE   AVAILABLE
+nginx-deployment   3/3     3            3
+```
+
+View Pods:
+
+```bash
+kubectl get po -o wide
+```
+
+View Deployment details:
+
+```bash
+kubectl describe deploy nginx-deployment
+```
+
+---
+
+## Scale Deployment
+
+Edit the deployment YAML and change replicas from 3 to 10.
+
+```yaml
+spec:
+  replicas: 10
+```
+
+Apply the updated file:
+
+```bash
+kubectl apply -f nginx-deployment.yaml
+```
+
+Verify:
+
+```bash
+kubectl get deploy
+```
+
+Output:
+
+```bash
+NAME               READY   UP-TO-DATE   AVAILABLE
+nginx-deployment   10/10   10           10
+```
+
+Check Pods:
+
+```bash
+kubectl get po -o wide
+```
+
+Check ReplicaSets:
+
+```bash
+kubectl get rs
+```
+
+Output:
+
+```bash
+NAME                          DESIRED   CURRENT   READY
+nginx-deployment-569f95f5cb   10        10        10
+nginx-rs                      3         3         3
+```
+
+---
+
+## View Deployment, ReplicaSets and Pods Together
+
+```bash
+kubectl get deploy,rs,po -o wide
+```
+
+Output:
+
+```bash
+deployment.apps/nginx-deployment
+
+replicaset.apps/nginx-deployment-569f95f5cb
+
+pod/nginx-deployment-569f95f5cb-xxxxx
+```
+
+This command displays:
+
+- Deployment details
+- ReplicaSet details
+- Pod details
+- Images
+- IP addresses
+- Node placement
+
+---
+
+## Rolling Update
+
+Update the deployment image from:
+
+```yaml
+image: nginx:1.25
+```
+
+to:
+
+```yaml
+image: nginx:1.26
+```
+
+Or update directly using:
+
+```bash
+kubectl set image deployment/nginx-deployment nginx=nginx:1.26
+```
+
+Output:
+
+```bash
+deployment.apps/nginx-deployment image updated
+```
+
+---
+
+## Observe Rolling Update
+
+Monitor Deployment:
+
+```bash
+kubectl get deploy,rs,po -o wide
+```
+
+During update you will observe:
+
+### Old ReplicaSet
+
+```bash
+nginx-deployment-569f95f5cb
+```
+
+### New ReplicaSet
+
+```bash
+nginx-deployment-8574879789
+```
+
+Example:
+
+```bash
+NAME                                          DESIRED   CURRENT   READY
+nginx-deployment-569f95f5cb                   8         8         8
+nginx-deployment-8574879789                   5         5         5
+```
+
+The Deployment gradually:
+
+- Creates Pods from the new ReplicaSet.
+- Removes Pods from the old ReplicaSet.
+- Maintains application availability throughout the update.
+
+---
+
+## Verify Rollout Status
+
+```bash
+kubectl rollout status deployment/nginx-deployment
+```
+
+Output:
+
+```bash
+deployment "nginx-deployment" successfully rolled out
+```
+
+---
+
+## Check Deployment Revision
+
+```bash
+kubectl describe deploy nginx-deployment
+```
+
+Example:
+
+```text
+Annotations:
+deployment.kubernetes.io/revision: 2
+```
+
+Revision 1:
+
+```text
+nginx:1.25
+```
+
+Revision 2:
+
+```text
+nginx:1.26
+```
+
+---
+
+## Rollback Deployment
+
+Rollback to the previous version:
+
+```bash
+kubectl rollout undo deployment/nginx-deployment
+```
+
+Output:
+
+```bash
+deployment.apps/nginx-deployment rolled back
+```
+
+---
+
+## Verify Rollback
+
+```bash
+kubectl get deploy,rs,po -o wide
+```
+
+Output:
+
+```bash
+deployment.apps/nginx-deployment   10/10
+```
+
+ReplicaSets:
+
+```bash
+nginx-deployment-569f95f5cb   10
+nginx-deployment-8574879789    0
+```
+
+Verify Deployment:
+
+```bash
+kubectl describe deploy nginx-deployment
+```
+
+Output:
+
+```text
+Image: nginx:1.25
+Revision: 3
+```
+
+The old ReplicaSet becomes active again and the newer ReplicaSet scales down to zero.
+
+---
+
+## Useful Commands
+
+### Create Deployment
+
+```bash
+kubectl apply -f nginx-deployment.yaml
+```
+
+### List Deployments
+
+```bash
+kubectl get deploy
+```
+
+### List ReplicaSets
+
+```bash
+kubectl get rs
+```
+
+### List Pods
+
+```bash
+kubectl get po
+```
+
+### Describe Deployment
+
+```bash
+kubectl describe deploy nginx-deployment
+```
+
+### Scale Deployment
+
+```bash
+kubectl scale deployment nginx-deployment --replicas=10
+```
+
+### Update Image
+
+```bash
+kubectl set image deployment/nginx-deployment nginx=nginx:1.26
+```
+
+### Check Rollout Status
+
+```bash
+kubectl rollout status deployment/nginx-deployment
+```
+
+### View Rollout History
+
+```bash
+kubectl rollout history deployment/nginx-deployment
+```
+
+### Rollback
+
+```bash
+kubectl rollout undo deployment/nginx-deployment
+```
+
+### Delete Deployment
+
+```bash
+kubectl delete deployment nginx-deployment
+```
+
+---
+
+## Conclusion
+
+A Deployment provides declarative updates for Pods and ReplicaSets. It supports scaling, rolling updates, rollback, and self-healing, making it the preferred Kubernetes workload controller for managing stateless applications.
+
+
+```
 arun@192.168.142.11's password:
     ┌──────────────────────────────────────────────────────────────────────┐
     │                 • MobaXterm Personal Edition v26.3 •                 │
