@@ -306,6 +306,8 @@ kubectl delete rs nginx-replicaset
 ReplicaSet ensures that the specified number of Pod replicas are always running. If a Pod fails or is deleted, ReplicaSet automatically creates a replacement Pod to maintain the desired state of the application.
 
 
+
+```
 root@controlplane:~$ vi replicaset.yaml 
 root@controlplane:~$ cat replicaset.yaml
 apiVersion: apps/v1
@@ -510,4 +512,4 @@ pod/nginx-replicaset-pb8xp   1/1     Running   0          13m   192.168.0.225   
 pod/nginx-replicaset-q8khg   1/1     Running   0          13m   192.168.0.112   controlplane   <none>           <none>
 pod/nginx-replicaset-vg75l   1/1     Running   0          13m   192.168.1.19    node01         <none>           <none>
 pod/nginx-replicaset-zbnnx   1/1     Running   0          13m   192.168.1.108   node01         <none>           <none>
-root@controlplane:~$ 
+root@controlplane:~$ ```
