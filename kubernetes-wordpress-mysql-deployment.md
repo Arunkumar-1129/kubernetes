@@ -705,7 +705,8 @@ mysql> select * from wp_users;
 
 After completing the WordPress installation wizard via the browser at `http://172.30.1.2:30080`, the admin dashboard is accessible and fully functional:
 
-![WordPress Admin Dashboard](./wordpress-dashboard.png)
+[![1-wp-setup-start.webp](https://i.postimg.cc/mZCPcxZd/1-wp-setup-start.webp)](https://postimg.cc/MXZ64FQR)
+[![Screenshot-2026-06-10-220632.png](https://i.postimg.cc/PrKrZTgK/Screenshot-2026-06-10-220632.png)](https://postimg.cc/GH8Cnwhs)
 
 The dashboard confirms:
 - WordPress **7.0** is running (as shown by the "Learn more about the 7.0 version" banner)
