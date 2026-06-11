@@ -1,14 +1,26 @@
 # MongoDB + Mongo Express Deployment on Kubernetes
 
-## 1. Create Namespace
+## Lab Objective
 
-### Create YAML
+Deploy:
+
+* MongoDB using StatefulSet
+* Persistent Storage using PVC
+* Mongo Express Web UI
+* Kubernetes Secret for credentials
+* Services for internal and external access
+
+---
+
+# Step 1: Create Namespace
+
+## Create File
 
 ```bash
 vi namespace.yaml
 ```
 
-### Content
+## namespace.yaml
 
 ```yaml
 apiVersion: v1
@@ -17,40 +29,53 @@ metadata:
   name: mongodb
 ```
 
-### Apply Configuration
+## Apply Configuration
 
 ```bash
 kubectl apply -f namespace.yaml
 ```
 
-### Output
+## Output
 
 ```bash
 namespace/mongodb created
 ```
 
-### Explanation
+## Verify
 
-* `kubectl apply` creates or updates Kubernetes resources.
-* `-f` specifies the YAML file.
-* A namespace named `mongodb` is created.
-* All MongoDB-related resources will be isolated inside this namespace.
+```bash
+kubectl get ns
+```
+
+## Output
+
+```bash
+NAME              STATUS   AGE
+default           Active   2d
+kube-system       Active   2d
+mongodb           Active   5s
+```
+
+## Explanation
+
+Creates a dedicated namespace named `mongodb` to isolate all MongoDB resources.
 
 ---
 
-## 2. Create MongoDB Secret
+# Step 2: Create Secret
 
-### Create YAML
+## Create File
 
 ```bash
 vi mongo-secret.yaml
 ```
 
-### Content
+## mongo-secret.yaml
 
 ```yaml
 apiVersion: v1
 kind: Secret
+
 metadata:
   name: mongodb-secret
   namespace: mongodb
@@ -62,182 +87,354 @@ stringData:
   mongo-root-password: admin123
 ```
 
-### Apply Configuration
+## Apply Secret
 
 ```bash
 kubectl apply -f mongo-secret.yaml
 ```
 
-### Output
+## Output
 
 ```bash
 secret/mongodb-secret created
 ```
 
-### Explanation
-
-* Stores MongoDB credentials securely.
-* Avoids hardcoding passwords in Deployment or StatefulSet manifests.
-* Values are later injected as environment variables.
-
----
-
-## 3. Create Persistent Volume Claim
-
-### Create YAML
+## Verify Secret
 
 ```bash
-vi mongo-pvc.yaml
+kubectl get secret -n mongodb
 ```
 
-### Content
+## Output
 
-```yaml
+```bash
+NAME             TYPE     DATA   AGE
+mongodb-secret   Opaque   2      8s
+```
+
+## View Secret
+
+```bash
+kubectl get secret mongodb-secret -n mongodb -o yaml
+```
+
+## Output
+
+```bash
 apiVersion: v1
-kind: PersistentVolumeClaim
-
+kind: Secret
 metadata:
-  name: mongodb-pvc
+  name: mongodb-secret
   namespace: mongodb
 
-spec:
-  accessModes:
-    - ReadWriteOnce
-
-  storageClassName: local-path
-
-  resources:
-    requests:
-      storage: 5Gi
+data:
+  mongo-root-password: YWRtaW4xMjM=
+  mongo-root-username: YWRtaW4=
+type: Opaque
 ```
 
-### Apply Configuration
+## Explanation
 
-```bash
-kubectl apply -f mongo-pvc.yaml
-```
-
-### Output
-
-```bash
-persistentvolumeclaim/mongodb-pvc created
-```
-
-### Verify
-
-```bash
-kubectl get pvc -n mongodb
-```
-
-### Example Output
-
-```bash
-NAME          STATUS    VOLUME   CAPACITY
-mongodb-pvc   Pending
-```
-
-### Explanation
-
-* Requests 5GB storage.
-* `ReadWriteOnce` allows mounting by one node.
-* PVC waits for a matching Persistent Volume.
-* In this setup the StatefulSet creates its own PVC, making this PVC optional.
+Stores MongoDB credentials securely.
 
 ---
 
-## 4. Deploy MongoDB StatefulSet
+# Step 3: Create MongoDB StatefulSet
 
-### Create YAML
+## Create File
 
 ```bash
 vi mongo-sts.yaml
 ```
 
-### Apply Configuration
+## mongo-sts.yaml
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+
+metadata:
+  name: mongodb
+  namespace: mongodb
+
+spec:
+  serviceName: mongodb-service
+
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: mongodb
+
+  template:
+    metadata:
+      labels:
+        app: mongodb
+
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:8
+
+        ports:
+        - containerPort: 27017
+
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-username
+
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-password
+
+        volumeMounts:
+        - name: mongo-data
+          mountPath: /data/db
+
+  volumeClaimTemplates:
+  - metadata:
+      name: mongo-data
+
+    spec:
+      accessModes:
+      - ReadWriteOnce
+
+      storageClassName: local-path
+
+      resources:
+        requests:
+          storage: 5Gi
+```
+
+## Apply StatefulSet
 
 ```bash
 kubectl apply -f mongo-sts.yaml
 ```
 
-### Output
+## Output
 
 ```bash
 statefulset.apps/mongodb created
 ```
 
-### Verify StatefulSet
+## Verify StatefulSet
 
 ```bash
 kubectl get sts -n mongodb
 ```
 
-### Output
+## Output
 
 ```bash
 NAME      READY   AGE
-mongodb   1/1     1m
+mongodb   1/1     30s
 ```
 
-### Verify Pod
+## Verify Pod
 
 ```bash
 kubectl get pods -n mongodb
 ```
 
-### Output
+## Output
 
 ```bash
 NAME        READY   STATUS    RESTARTS   AGE
-mongodb-0   1/1     Running   0          1m
+mongodb-0   1/1     Running   0          25s
 ```
 
-### Explanation
+## Verify PVC
 
-* StatefulSet is preferred for databases.
-* Provides stable pod names.
-* Maintains persistent storage.
-* Keeps network identity intact across restarts.
+```bash
+kubectl get pvc -n mongodb
+```
+
+## Output
+
+```bash
+NAME                  STATUS   VOLUME                                     CAPACITY
+mongo-data-mongodb-0  Bound    pvc-0a506372-38e4-4e7e-a1f1-8a23aef5cba3   5Gi
+```
+
+## Explanation
+
+StatefulSet provides:
+
+* Stable Pod Names
+* Stable Storage
+* Stable Network Identity
+
+MongoDB pod becomes:
+
+```bash
+mongodb-0
+```
 
 ---
 
-## 5. Create MongoDB Service
+# Step 4: Create MongoDB Service
 
-### Create YAML
+## Create File
 
 ```bash
 vi mongo-svc.yaml
 ```
 
-### Apply Configuration
+## mongo-svc.yaml
+
+```yaml
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: mongodb-service
+  namespace: mongodb
+
+spec:
+  selector:
+    app: mongodb
+
+  ports:
+  - port: 27017
+    targetPort: 27017
+
+  type: ClusterIP
+```
+
+## Apply Service
 
 ```bash
 kubectl apply -f mongo-svc.yaml
 ```
 
-### Output
+## Output
 
 ```bash
 service/mongodb-service created
 ```
 
-### Verify
+## Verify
 
 ```bash
 kubectl get svc -n mongodb
 ```
 
-### Output
+## Output
 
 ```bash
-NAME              TYPE        CLUSTER-IP      PORT(S)
-mongodb-service   ClusterIP   10.111.121.148 27017/TCP
+NAME              TYPE        CLUSTER-IP        PORT(S)
+mongodb-service   ClusterIP   10.111.121.148   27017/TCP
 ```
 
-### Explanation
+## Explanation
 
-* Creates an internal service.
-* Exposes MongoDB on port 27017.
-* Other pods can connect using:
+Creates an internal service for MongoDB communication.
+
+---
+
+# Step 5: Create Mongo Express Deployment
+
+## Create File
+
+```bash
+vi mongo-express-deploy.yaml
+```
+
+## mongo-express-deploy.yaml
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: mongo-express
+  namespace: mongodb
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: mongo-express
+
+  template:
+    metadata:
+      labels:
+        app: mongo-express
+
+    spec:
+      containers:
+      - name: mongo-express
+        image: mongo-express
+
+        ports:
+        - containerPort: 8081
+
+        env:
+        - name: ME_CONFIG_MONGODB_ADMINUSERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-username
+
+        - name: ME_CONFIG_MONGODB_ADMINPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-password
+
+        - name: ME_CONFIG_MONGODB_SERVER
+          value: mongodb-service
+```
+
+## Apply Deployment
+
+```bash
+kubectl apply -f mongo-express-deploy.yaml
+```
+
+## Output
+
+```bash
+deployment.apps/mongo-express created
+```
+
+## Verify Deployment
+
+```bash
+kubectl get deployment -n mongodb
+```
+
+## Output
+
+```bash
+NAME            READY   UP-TO-DATE   AVAILABLE
+mongo-express   1/1     1            1
+```
+
+## Verify Pod
+
+```bash
+kubectl get pods -n mongodb
+```
+
+## Output
+
+```bash
+NAME                                   READY   STATUS
+mongo-express-6795f46866-c7c9w         1/1     Running
+mongodb-0                              1/1     Running
+```
+
+## Explanation
+
+Mongo Express connects to MongoDB using:
 
 ```bash
 mongodb-service:27017
@@ -245,88 +442,55 @@ mongodb-service:27017
 
 ---
 
-## 6. Deploy Mongo Express
+# Step 6: Create Mongo Express Service
 
-### Create YAML
-
-```bash
-vi mongo-express-deploy.yaml
-```
-
-### Apply Configuration
-
-```bash
-kubectl apply -f mongo-express-deploy.yaml
-```
-
-### Output
-
-```bash
-deployment.apps/mongo-express created
-```
-
-### Verify Deployment
-
-```bash
-kubectl get deploy -n mongodb
-```
-
-### Output
-
-```bash
-NAME            READY   UP-TO-DATE   AVAILABLE
-mongo-express   1/1     1            1
-```
-
-### Verify Pod
-
-```bash
-kubectl get pods -n mongodb
-```
-
-### Output
-
-```bash
-NAME                                  READY   STATUS
-mongo-express-6795f46866-c7c9w        1/1     Running
-mongodb-0                             1/1     Running
-```
-
-### Explanation
-
-* Deploys Mongo Express web interface.
-* Uses credentials from Kubernetes Secret.
-* Connects to MongoDB through `mongodb-service`.
-
----
-
-## 7. Create Mongo Express Service
-
-### Create YAML
+## Create File
 
 ```bash
 vi mongo-express-svc.yaml
 ```
 
-### Apply Configuration
+## mongo-express-svc.yaml
+
+```yaml
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: mongo-express-service
+  namespace: mongodb
+
+spec:
+  type: NodePort
+
+  selector:
+    app: mongo-express
+
+  ports:
+  - port: 8081
+    targetPort: 8081
+    nodePort: 30081
+```
+
+## Apply Service
 
 ```bash
 kubectl apply -f mongo-express-svc.yaml
 ```
 
-### Output
+## Output
 
 ```bash
 service/mongo-express-service created
 ```
 
-### Verify
+## Verify
 
 ```bash
 kubectl get svc -n mongodb
 ```
 
-### Output
+## Output
 
 ```bash
 NAME                    TYPE       CLUSTER-IP      PORT(S)
@@ -334,47 +498,26 @@ mongo-express-service   NodePort   10.100.9.94    8081:30081/TCP
 mongodb-service         ClusterIP  10.111.121.148 27017/TCP
 ```
 
-### Explanation
+## Explanation
 
-* Exposes Mongo Express outside the cluster.
-* Kubernetes allocates NodePort `30081`.
-* Traffic flow:
-
-```text
-Browser
-   │
-   ▼
-NodeIP:30081
-   │
-   ▼
-Mongo Express Service
-   │
-   ▼
-Mongo Express Pod
-   │
-   ▼
-MongoDB Service
-   │
-   ▼
-MongoDB Pod
-```
+Exposes Mongo Express externally using NodePort 30081.
 
 ---
 
-# Verification Commands
+# Final Verification
 
-## View All Resources
+## Check Everything
 
 ```bash
 kubectl get all -n mongodb
 ```
 
-### Output
+## Output
 
 ```bash
-NAME                                      READY   STATUS
-pod/mongo-express-6795f46866-c7c9w        1/1     Running
-pod/mongodb-0                             1/1     Running
+NAME                                     READY   STATUS
+pod/mongo-express-6795f46866-c7c9w       1/1     Running
+pod/mongodb-0                            1/1     Running
 
 NAME                            TYPE
 service/mongo-express-service   NodePort
@@ -383,118 +526,70 @@ service/mongodb-service         ClusterIP
 NAME                            READY
 deployment.apps/mongo-express   1/1
 
-NAME                            READY
-statefulset.apps/mongodb        1/1
+NAME                     READY
+statefulset.apps/mongodb 1/1
 ```
 
 ---
 
-## Check PVC Status
+# Useful Troubleshooting Commands
 
-```bash
-kubectl get pvc -n mongodb
-```
-
-### Output
-
-```bash
-NAME                  STATUS   VOLUME
-mongo-data-mongodb-0  Bound
-mongodb-pvc           Pending
-```
-
-### Explanation
-
-`mongo-data-mongodb-0`
-
-* Automatically created by StatefulSet.
-* Attached to MongoDB pod.
-* Stores database files permanently.
-
----
-
-## Inspect Deployment
+## Describe Deployment
 
 ```bash
 kubectl describe deployment mongo-express -n mongodb
 ```
 
-### Purpose
+## Describe StatefulSet
 
-Shows:
+```bash
+kubectl describe sts mongodb -n mongodb
+```
 
-* Labels
-* Replicas
-* Environment variables
-* Events
-* Container configuration
-* Troubleshooting information
-
----
-
-## View Logs
-
-MongoDB:
+## View MongoDB Logs
 
 ```bash
 kubectl logs mongodb-0 -n mongodb
 ```
 
-Mongo Express:
+## View Mongo Express Logs
 
 ```bash
 kubectl logs deployment/mongo-express -n mongodb
 ```
 
-### Purpose
+## Watch Resources Live
 
-Useful for:
-
-* Authentication failures
-* Connection issues
-* Startup errors
-* CrashLoopBackOff troubleshooting
+```bash
+watch kubectl get po,pvc,svc,sts -n mongodb -o wide
+```
 
 ---
 
-## Watch Resources Continuously
+# Access Mongo Express
+
+## Get Node IP
 
 ```bash
-watch kubectl get po,pvc,sts -n mongodb -o wide
+kubectl get nodes -o wide
 ```
 
-### Purpose
-
-Refreshes every 2 seconds and shows:
-
-* Pod status
-* PVC status
-* StatefulSet health
-
----
-
-# Final Result
-
-Successfully deployed:
+Example:
 
 ```bash
-✓ Namespace
-✓ Secret
-✓ StatefulSet
-✓ Persistent Storage
-✓ MongoDB Service
-✓ Mongo Express Deployment
-✓ Mongo Express NodePort Service
+NAME           STATUS   ROLES           INTERNAL-IP
+controlplane   Ready    control-plane   192.168.1.10
 ```
 
-Access Mongo Express:
+## Open Browser
 
 ```bash
-http://<Node-IP>:30081
+http://192.168.1.10:30081
 ```
 
-MongoDB Internal Endpoint:
+Login Credentials:
 
 ```bash
-mongodb-service:27017
+Username: admin
+Password: admin123
 ```
